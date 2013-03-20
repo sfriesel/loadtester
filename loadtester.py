@@ -59,18 +59,20 @@ class Browser(Thread):
                 now = time.time()
             resp_time = self.run_scenario(DEFAULT_SCENARIO)
             self.event_queue.task_done()
-            sys.stderr.write("done {0}\n".format(resp_time))
+            #sys.stderr.write("done {0}\n".format(resp_time))
 
     @staticmethod
     def handle_requests(request_queue, result_queue, scenario_finished_event):
         http = httplib2.Http()
         while not scenario_finished_event.is_set():
             try:
-                url = request_queue.get_nowait()
+                url = request_queue.get(block=True, timeout=0.5)
             except Empty:
-                time.sleep(0.5)
                 continue
-            response, content = http.request(url, headers={'Host': 'sfloadtest2.loudcontrol.de'})
+            start_time = time.time()
+            response, content = http.request(url, headers={'Host': 'sfloadtest2.loudcontrol.de', 'Connection': 'keep-alive'})
+            end_time = time.time()
+            #sys.stderr.write('REQ: {0}\n'.format(end_time - start_time))
             result_queue.put((response, content))
             request_queue.task_done()
 
@@ -139,7 +141,7 @@ class TestSetup(object):
         for browser in self.browsers:
             browser.start()
         #events = sorted(itertools.chain(gaussian_dist(num=900, duration=60, mean=30, stddev=10), uniform_dist(num=100, duration=60)))
-        events = sorted(itertools.chain(uniform_dist(num=1000, duration=60)))
+        events = sorted(itertools.chain(uniform_dist(num=500, duration=60)))
         self.start_time = time.time()
         for event in events:
             self.event_queue.put(event)
