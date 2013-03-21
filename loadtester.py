@@ -14,7 +14,7 @@ import urllib3.connectionpool
 
 DOMAIN = sys.argv[1]
 
-DEFAULT_SCENARIO = [['/'], ['/foo'] * 100]
+DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
 
 
 class Browser(Thread):
