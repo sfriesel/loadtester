@@ -6,5 +6,5 @@ setup(
     description='dirty little script to test loadbalancer performance',
     author='Stefan Friesel',
     scripts=['loadtester.py'],
-    install_requires=['httplib2', 'gevent'],
+    install_requires=['urllib3', 'gevent'],
 )
