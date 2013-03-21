@@ -1,4 +1,6 @@
 #!/usr/bin/python2
+import gevent.monkey
+gevent.monkey.patch_all()
 from threading import (
     Thread,
     Event,
@@ -27,8 +29,6 @@ def force_ip4(*args, **kwargs):
 socket.getaddrinfo = force_ip4
 # End of ugly hack
 import httplib2
-import gevent.monkey
-gevent.monkey.patch_all()
 
 DOMAIN = sys.argv[1]
 
@@ -123,7 +123,7 @@ class TestSetup(object):
     def __init__(self):
         self.event_queue = Queue()
         self.stopping = Event()
-        self.browsers = [Browser(self) for _ in range(1000)]
+        self.browsers = [Browser(self) for _ in range(300)]
         self.start_time = None
         self.error_count = 0
 
