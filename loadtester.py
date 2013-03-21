@@ -10,29 +10,11 @@ import time
 import random
 import sys
 import itertools
-import socket
-from socket import getaddrinfo
-
-
-# Ugly hack to force ipv4
-def force_ip4(*args, **kwargs):
-    args = list(args)
-    try:
-        args[2] = socket.AF_INET
-    except IndexError:
-        pass
-    if 'family' in kwargs:
-        kwargs['family'] = socket.AF_INET
-    return getaddrinfo(*args, **kwargs)
-
-# replace the original socket.getaddrinfo by our version
-socket.getaddrinfo = force_ip4
-# End of ugly hack
-import httplib2
+import urllib3.connectionpool
 
 DOMAIN = sys.argv[1]
 
-DEFAULT_SCENARIO = [['http://' + DOMAIN + '/'], ['http://' + DOMAIN + '/foo'] * 100]
+DEFAULT_SCENARIO = [['/'], ['/foo'] * 100]
 
 
 class Browser(Thread):
@@ -41,6 +23,7 @@ class Browser(Thread):
         self.daemon = True
         self.event_queue = test.event_queue
         self.test_env = test
+        self.pool = None
 
     def run(self):
         while True:
@@ -56,15 +39,13 @@ class Browser(Thread):
             self.event_queue.task_done()
             #sys.stderr.write("done {0}\n".format(resp_time))
 
-    @staticmethod
-    def handle_requests(request_queue, result_queue):
-        http = httplib2.Http()
+    def handle_requests(self, request_queue, result_queue):
         while True:
             url = request_queue.get(block=True)
             if url is None:
                 break
-            response, content = http.request(url, headers={'Host': DOMAIN, 'Connection': 'keep-alive'})
-            result_queue.put((response, content))
+            response = self.pool.urlopen('GET', url, headers={'Host': DOMAIN, 'Connection': 'keep-alive'})
+            result_queue.put(response)
             request_queue.task_done()
 
     def run_scenario(self, scenario):
@@ -74,6 +55,7 @@ class Browser(Thread):
         for req in requester:
             req.start()
         scenario_success = True
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(DOMAIN, port=80, maxsize=6, block=True)
         scenario_start = time.time()
         for stage in scenario:
             for url in stage:
@@ -81,7 +63,7 @@ class Browser(Thread):
             request_queue.join()
             while True:
                 try:
-                    response, _ = result_queue.get_nowait()
+                    response = result_queue.get_nowait()
                     if response.status != 200:
                         sys.stderr.write("got http code {0}\n".format(response.status))
                         scenario_success = False
@@ -90,15 +72,16 @@ class Browser(Thread):
             if not scenario_success:
                 break
         scenario_end = time.time()
-        if scenario_success:
-            sys.stdout.write("{0} {1}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
-        else:
-            sys.stderr.write("scenario failed\n")
-            self.test_env.error_count += 1
         for req in requester:
             request_queue.put(None)
+        if scenario_success:
+            sys.stdout.write("{0} {1} 1\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
+        else:
+            sys.stdout.write("{0} {1} 0\n".format(scenario_end - self.test_env.start_time, scenario_start - self.test_env.start_time))
+            self.test_env.error_count += 1
         for req in requester:
             req.join()
+        self.pool = None
         return scenario_end - scenario_start
 
 
@@ -123,15 +106,15 @@ class TestSetup(object):
     def __init__(self):
         self.event_queue = Queue()
         self.stopping = Event()
-        self.browsers = [Browser(self) for _ in range(300)]
+        self.browsers = [Browser(self) for _ in range(500)]
         self.start_time = None
         self.error_count = 0
 
     def run(self):
         for browser in self.browsers:
             browser.start()
-        #events = sorted(itertools.chain(gaussian_dist(num=900, duration=60, mean=30, stddev=10), uniform_dist(num=100, duration=60)))
-        events = sorted(itertools.chain(uniform_dist(num=500, duration=60)))
+        #events = sorted(itertools.chain(gaussian_dist(num=10, duration=10, mean=5, stddev=2), uniform_dist(num=100, duration=60)))
+        events = sorted(itertools.chain(uniform_dist(num=700, duration=100)))
         self.start_time = time.time()
         for event in events:
             self.event_queue.put(event)
