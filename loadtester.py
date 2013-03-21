@@ -12,7 +12,7 @@ import sys
 import itertools
 import urllib3.connectionpool
 
-DOMAIN = sys.argv[1]
+DOMAIN = None
 
 DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
 
@@ -77,7 +77,7 @@ class Browser(Thread):
         if scenario_success:
             sys.stdout.write("{0} {1} 1\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
         else:
-            sys.stdout.write("{0} {1} 0\n".format(scenario_end - self.test_env.start_time, scenario_start - self.test_env.start_time))
+            sys.stdout.write("{0} {1} 0\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
             self.test_env.error_count += 1
         for req in requester:
             req.join()
@@ -103,18 +103,19 @@ def uniform_dist(num, duration):
 
 
 class TestSetup(object):
-    def __init__(self):
+    def __init__(self, args):
         self.event_queue = Queue()
         self.stopping = Event()
-        self.browsers = [Browser(self) for _ in range(500)]
         self.start_time = None
         self.error_count = 0
+        self.args = args
+        self.browsers = [Browser(self) for _ in range(self.args.browsers)]
 
     def run(self):
         for browser in self.browsers:
             browser.start()
         #events = sorted(itertools.chain(gaussian_dist(num=10, duration=10, mean=5, stddev=2), uniform_dist(num=100, duration=60)))
-        events = sorted(itertools.chain(uniform_dist(num=700, duration=100)))
+        events = sorted(itertools.chain(uniform_dist(num=self.args.uniform * self.args.duration / 60, duration=self.args.duration)))
         self.start_time = time.time()
         for event in events:
             self.event_queue.put(event)
@@ -122,4 +123,14 @@ class TestSetup(object):
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
 if __name__ == '__main__':
-    TestSetup().run()
+    import argparse
+    parser = argparse.ArgumentParser(description='loadtest')
+    parser.add_argument('--browsers', default=150, type=int, help='maximum number of virtual browser (fd limit!)')
+    parser.add_argument('--duration', default=60, type=int, help='test duration in seconds')
+    parser.add_argument('--uniform', default=600, type=int, help='uniformly distributed sessions per minute')
+    parser.add_argument('domain')
+
+
+    args = parser.parse_args()
+    DOMAIN = args.domain
+    TestSetup(args).run()
