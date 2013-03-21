@@ -30,9 +30,9 @@ import httplib2
 import gevent.monkey
 gevent.monkey.patch_all()
 
-domain = sys.argv[1]
+DOMAIN = sys.argv[1]
 
-DEFAULT_SCENARIO = [['http://' + domain + '/'], ['http://' + domain + '/foo'] * 100]
+DEFAULT_SCENARIO = [['http://' + DOMAIN + '/'], ['http://' + DOMAIN + '/foo'] * 100]
 
 
 class Browser(Thread):
@@ -43,56 +43,45 @@ class Browser(Thread):
         self.test_env = test
 
     def run(self):
-        #sys.stderr.write('browser started\n')
         while True:
-            event = self.event_queue.get()
-            sys.stderr.write("{0}\n".format(self.event_queue.qsize()))
-            start_time = self.test_env.start_time
-            #sys.stderr.write('got event\n')
+            event_time = self.event_queue.get() + self.test_env.start_time
+            #sys.stderr.write("{0}\n".format(self.event_queue.qsize()))
             # for now event is just the time when the next scenario should be run
             now = time.time()
-            if now > start_time + event:
-                sys.stderr.write("WARNING: missed event {e} by {diff}s\n".format(e=event, diff=(now - start_time - event)))
-            while now + 0.001 < start_time + event:
-                #sys.stderr.write('{0} left to sleep\n'.format(event - now))
-                time.sleep(start_time + event - now)
-                now = time.time()
-            resp_time = self.run_scenario(DEFAULT_SCENARIO)
+            if now - 0.001 > event_time:
+                sys.stderr.write("WARNING: missed event by {diff}s\n".format(diff=(now - event_time)))
+            if now + 0.001 < event_time:
+                time.sleep(event_time - now)
+            self.run_scenario(DEFAULT_SCENARIO)
             self.event_queue.task_done()
             #sys.stderr.write("done {0}\n".format(resp_time))
 
     @staticmethod
-    def handle_requests(request_queue, result_queue, scenario_finished_event):
+    def handle_requests(request_queue, result_queue):
         http = httplib2.Http()
-        while not scenario_finished_event.is_set():
-            try:
-                url = request_queue.get(block=True, timeout=0.5)
-            except Empty:
-                continue
-            start_time = time.time()
-            response, content = http.request(url, headers={'Host': 'sfloadtest2.loudcontrol.de', 'Connection': 'keep-alive'})
-            end_time = time.time()
-            #sys.stderr.write('REQ: {0}\n'.format(end_time - start_time))
+        while True:
+            url = request_queue.get(block=True)
+            if url is None:
+                break
+            response, content = http.request(url, headers={'Host': DOMAIN, 'Connection': 'keep-alive'})
             result_queue.put((response, content))
             request_queue.task_done()
 
     def run_scenario(self, scenario):
-        #sys.stderr.write("starting scenario\n")
         request_queue = Queue()
         result_queue = Queue()
-        finished = Event()
-        requester = [Thread(target=self.handle_requests, args=(request_queue, result_queue, finished)) for _ in range(6)]
+        requester = [Thread(target=self.handle_requests, args=(request_queue, result_queue)) for _ in range(6)]
         for req in requester:
             req.start()
         scenario_success = True
         scenario_start = time.time()
         for stage in scenario:
-            for req in stage:
-                request_queue.put(req)
+            for url in stage:
+                request_queue.put(url)
             request_queue.join()
             while True:
                 try:
-                    response, content = result_queue.get_nowait()
+                    response, _ = result_queue.get_nowait()
                     if response.status != 200:
                         sys.stderr.write("got http code {0}\n".format(response.status))
                         scenario_success = False
@@ -101,12 +90,13 @@ class Browser(Thread):
             if not scenario_success:
                 break
         scenario_end = time.time()
-        finished.set()
         if scenario_success:
             sys.stdout.write("{0} {1}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
         else:
             sys.stderr.write("scenario failed\n")
             self.test_env.error_count += 1
+        for req in requester:
+            request_queue.put(None)
         for req in requester:
             req.join()
         return scenario_end - scenario_start
