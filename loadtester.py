@@ -116,7 +116,7 @@ class TestSetup(object):
             browser.start()
         #events = sorted(itertools.chain(gaussian_dist(num=10, duration=10, mean=5, stddev=2), uniform_dist(num=100, duration=60)))
         events = sorted(itertools.chain(uniform_dist(num=self.args.uniform * self.args.duration / 60, duration=self.args.duration)))
-        self.start_time = time.time()
+        self.start_time = self.args.start_time or time.time()
         for event in events:
             self.event_queue.put(event)
         self.event_queue.join()
@@ -128,6 +128,7 @@ if __name__ == '__main__':
     parser.add_argument('--browsers', default=150, type=int, help='maximum number of virtual browser (fd limit!)')
     parser.add_argument('--duration', default=60, type=int, help='test duration in seconds')
     parser.add_argument('--uniform', default=600, type=int, help='uniformly distributed sessions per minute')
+    parser.add_argument('--start-time', default=None, type=float, help='time when to start the test (unix timestamp)')
     parser.add_argument('domain')
 
 
