@@ -12,8 +12,6 @@ import sys
 import itertools
 import urllib3.connectionpool
 
-DOMAIN = None
-
 DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
 
 
@@ -28,7 +26,6 @@ class Browser(Thread):
     def run(self):
         while True:
             event_time = self.event_queue.get() + self.test_env.start_time
-            #sys.stderr.write("{0}\n".format(self.event_queue.qsize()))
             # for now event is just the time when the next scenario should be run
             now = time.time()
             if now - 0.001 > event_time:
@@ -37,14 +34,13 @@ class Browser(Thread):
                 time.sleep(event_time - now)
             self.run_scenario(DEFAULT_SCENARIO)
             self.event_queue.task_done()
-            #sys.stderr.write("done {0}\n".format(resp_time))
 
     def handle_requests(self, request_queue, result_queue):
         while True:
             url = request_queue.get(block=True)
             if url is None:
                 break
-            response = self.pool.urlopen('GET', url, headers={'Host': DOMAIN, 'Connection': 'keep-alive'})
+            response = self.pool.urlopen('GET', url, headers={'Host': self.test_env.args.host or self.test_env.args.domain, 'Connection': 'keep-alive'})
             result_queue.put(response)
             request_queue.task_done()
 
@@ -55,7 +51,7 @@ class Browser(Thread):
         for req in requester:
             req.start()
         scenario_success = True
-        self.pool = urllib3.connectionpool.HTTPConnectionPool(DOMAIN, port=80, maxsize=6, block=True)
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.domain, port=80, maxsize=6, block=True)
         scenario_start = time.time()
         for stage in scenario:
             for url in stage:
@@ -81,7 +77,7 @@ class Browser(Thread):
             self.test_env.error_count += 1
         for req in requester:
             req.join()
-        self.pool = None
+        self.pool.close()
         return scenario_end - scenario_start
 
 
@@ -114,7 +110,6 @@ class TestSetup(object):
     def run(self):
         for browser in self.browsers:
             browser.start()
-        #events = sorted(itertools.chain(gaussian_dist(num=10, duration=10, mean=5, stddev=2), uniform_dist(num=100, duration=60)))
         events = sorted(itertools.chain(uniform_dist(num=self.args.uniform * self.args.duration / 60, duration=self.args.duration)))
         self.start_time = self.args.start_time or time.time()
         for event in events:
@@ -129,9 +124,9 @@ if __name__ == '__main__':
     parser.add_argument('--duration', default=60, type=int, help='test duration in seconds')
     parser.add_argument('--uniform', default=600, type=int, help='uniformly distributed sessions per minute')
     parser.add_argument('--start-time', default=None, type=float, help='time when to start the test (unix timestamp)')
+    parser.add_argument('--host', default=None, help='value of host header (default is domain)')
     parser.add_argument('domain')
 
 
     args = parser.parse_args()
-    DOMAIN = args.domain
     TestSetup(args).run()
