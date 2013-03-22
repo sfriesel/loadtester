@@ -46,7 +46,10 @@ class Browser(Thread):
                 break
             if self.log_requests:
                 request_start = time.time()
-            response = self.pool.urlopen('GET', url, headers={'Host': self.test_env.args.host or self.test_env.args.address, 'Connection': 'keep-alive'})
+            response = self.pool.urlopen('GET', url, headers={
+                'Host': self.test_env.args.host or self.test_env.args.address,
+                'Connection': 'keep-alive',
+                'User-Agent': 'sfloadtester'})
             if self.log_requests:
                 request_end = time.time()
                 self.test_env.requests_file.write(
