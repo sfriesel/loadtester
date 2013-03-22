@@ -5,7 +5,10 @@ from threading import (
     Thread,
     Event,
 )
-from Queue import Queue, Empty
+from Queue import (
+    Queue,
+    Empty,
+)
 import time
 import random
 import sys
@@ -16,11 +19,12 @@ DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
 
 
 class Browser(Thread):
-    def __init__(self, test):
-        Thread.__init__(self)
+    def __init__(self, test, **kwargs):
+        Thread.__init__(self, **kwargs)
         self.daemon = True
         self.event_queue = test.event_queue
         self.test_env = test
+        self.log_requests = bool(self.test_env.requests_file)
         self.pool = None
 
     def run(self):
@@ -40,7 +44,17 @@ class Browser(Thread):
             url = request_queue.get(block=True)
             if url is None:
                 break
-            response = self.pool.urlopen('GET', url, headers={'Host': self.test_env.args.host or self.test_env.args.domain, 'Connection': 'keep-alive'})
+            if self.log_requests:
+                request_start = time.time()
+            response = self.pool.urlopen('GET', url, headers={'Host': self.test_env.args.host or self.test_env.args.address, 'Connection': 'keep-alive'})
+            if self.log_requests:
+                request_end = time.time()
+                self.test_env.requests_file.write(
+                    '{browser_number} {start} {end} {status}\n'.format(
+                        browser_number=int(self.name),
+                        start=request_start - self.test_env.start_time,
+                        end=request_end - self.test_env.start_time,
+                        status=response.status))
             result_queue.put(response)
             request_queue.task_done()
 
@@ -51,7 +65,7 @@ class Browser(Thread):
         for req in requester:
             req.start()
         scenario_success = True
-        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.domain, port=80, maxsize=6, block=True)
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
         scenario_start = time.time()
         for stage in scenario:
             for url in stage:
@@ -105,7 +119,8 @@ class TestSetup(object):
         self.start_time = None
         self.error_count = 0
         self.args = args
-        self.browsers = [Browser(self) for _ in range(self.args.browsers)]
+        self.requests_file = open(self.args.requests_file[0], 'wb') if self.args.requests_file else None
+        self.browsers = [Browser(self, name=str(i)) for i in range(self.args.browsers)]
 
     def run(self):
         for browser in self.browsers:
@@ -119,14 +134,14 @@ class TestSetup(object):
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='loadtest')
-    parser.add_argument('--browsers', default=150, type=int, help='maximum number of virtual browser (fd limit!)')
+    parser = argparse.ArgumentParser(description='Loadtest a website with a somewhat realistic access pattern.')
+    parser.add_argument('--browsers', default=150, type=int, help='maximum number of virtual browsers (fd limit!)')
     parser.add_argument('--duration', default=60, type=int, help='test duration in seconds')
     parser.add_argument('--uniform', default=600, type=int, help='uniformly distributed sessions per minute')
-    parser.add_argument('--start-time', default=None, type=float, help='time when to start the test (unix timestamp)')
-    parser.add_argument('--host', default=None, help='value of host header (default is domain)')
-    parser.add_argument('domain')
-
+    parser.add_argument('--start-time', type=float, help='time when to start the test (unix timestamp)')
+    parser.add_argument('--host', help='value of host header (default is domain)')
+    parser.add_argument('--requests-file', metavar='FILE', nargs=1, help='in addition to normal output, log every single request to FILE')
+    parser.add_argument('address', help='the address to connect to')
 
     args = parser.parse_args()
     TestSetup(args).run()
