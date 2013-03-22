@@ -12,7 +12,9 @@ from Queue import (
 import time
 import random
 import sys
+import socket
 import itertools
+from collections import namedtuple
 import urllib3.connectionpool
 
 DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
@@ -46,10 +48,13 @@ class Browser(Thread):
                 break
             if self.log_requests:
                 request_start = time.time()
-            response = self.pool.urlopen('GET', url, headers={
-                'Host': self.test_env.args.host or self.test_env.args.address,
-                'Connection': 'keep-alive',
-                'User-Agent': 'sfloadtester'})
+            try:
+                response = self.pool.urlopen('GET', url, headers={
+                    'Host': self.test_env.args.host or self.test_env.args.address,
+                    'Connection': 'keep-alive',
+                    'User-Agent': 'sfloadtester'})
+            except socket.error as e:
+                response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
             if self.log_requests:
                 request_end = time.time()
                 self.test_env.requests_file.write(
