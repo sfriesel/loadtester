@@ -54,10 +54,10 @@ class Browser(Thread):
             except socket.error as e:
                 response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
             else:
-                if response.getheader('content-type').startswith('text/'):
-                    content = response.read()
-                    for line in content:
-                        if line == '\n':
+                if response.status == 200 and response.getheader('content-type').startswith('text/'):
+                    content = response.data
+                    for line in content.split('\n'):
+                        if line == '':
                             break
                         else:
                             request_queue.put(line.rstrip())
@@ -72,7 +72,7 @@ class Browser(Thread):
                         status=response.status))
 
             if response.status != 200:
-                sys.stderr.write("got http code {0}\n".format(response.status))
+                sys.stderr.write(url + " got http code {0}\n".format(response.status))
                 scenario_failed.set()
             request_queue.task_done()
 
@@ -89,7 +89,7 @@ class Browser(Thread):
         scenario_end = time.time()
         for req in requester:
             request_queue.put(None)
-        sys.stdout.write("{0} {1} {2}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time, int(scenario_failed.is_set())))
+        sys.stdout.write("{0} {1} {2}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time, int(not scenario_failed.is_set())))
         if scenario_failed.is_set():
             self.test_env.error_count += 1
         for req in requester:
