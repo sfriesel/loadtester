@@ -1,0 +1,10 @@
+GEM
+  remote: http://rubygems.org/
+  specs:
+    binary_search (0.3.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  binary_search
