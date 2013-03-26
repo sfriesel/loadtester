@@ -1,7 +1,8 @@
 require 'set'
+require 'rubygems'
 require 'binary_search/native'
 
-require_relative 'analyze_helpers'
+require './analyze_helpers'
 
 BUCKET_SIZE = 0.1
 

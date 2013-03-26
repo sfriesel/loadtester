@@ -1,4 +1,4 @@
-require_relative 'analyze_helpers'
+require './analyze_helpers'
 
 def analyze(d, options={})
   show_stats d
