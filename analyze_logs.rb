@@ -1,7 +1,7 @@
 require './analyze_helpers'
 
 def analyze(d, options={})
-  show_stats d
+  show_stats d, :unit => 's'
   n = d.size
 
   if options[:partitions]
@@ -11,7 +11,7 @@ def analyze(d, options={})
 
     partitions.each_with_index do |p, i|
       puts "\tpartition #{ i*10 }%-#{ (i + 1) * 10 }%"
-      show_stats p, "\t\t"
+      show_stats p, :prefix => "\t\t", :unit => 's'
     end
   end
 

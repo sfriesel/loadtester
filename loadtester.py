@@ -1,8 +1,14 @@
 #!/usr/bin/python2
 import gevent.monkey
 gevent.monkey.patch_all()
-from threading import Thread, Event, Timer
-from Queue import Queue, Empty
+from threading import (
+    Thread,
+    Event,
+)
+from Queue import (
+    Queue,
+    Empty,
+)
 import time
 import random
 import sys
@@ -10,8 +16,6 @@ import socket
 import itertools
 from collections import namedtuple
 import urllib3.connectionpool
-
-DEFAULT_SCENARIO = [['/'], ['/fake.css', '/fake.png', '/fake.js'] * 10]
 
 
 class Browser(Thread):
@@ -32,10 +36,10 @@ class Browser(Thread):
                 sys.stderr.write("WARNING: missed event by {diff}s\n".format(diff=(now - event_time)))
             if now + 0.001 < event_time:
                 time.sleep(event_time - now)
-            self.run_scenario(DEFAULT_SCENARIO)
+            self.run_scenario()
             self.event_queue.task_done()
 
-    def handle_requests(self, request_queue, result_queue):
+    def handle_requests(self, request_queue, scenario_failed):
         while True:
             url = request_queue.get(block=True)
             if url is None:
@@ -49,6 +53,15 @@ class Browser(Thread):
                     'User-Agent': 'sfloadtester'})
             except socket.error as e:
                 response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
+            else:
+                if response.status == 200 and response.getheader('content-type').startswith('text/'):
+                    content = response.data
+                    for line in content.split('\n'):
+                        if line == '':
+                            break
+                        else:
+                            request_queue.put(line.rstrip())
+
             if self.log_requests:
                 request_end = time.time()
                 self.test_env.requests_file.write(
@@ -57,39 +70,27 @@ class Browser(Thread):
                         start=request_start - self.test_env.start_time,
                         end=request_end - self.test_env.start_time,
                         status=response.status))
-            result_queue.put(response)
+
+            if response.status != 200:
+                sys.stderr.write(url + " got http code {0}\n".format(response.status))
+                scenario_failed.set()
             request_queue.task_done()
 
-    def run_scenario(self, scenario):
+    def run_scenario(self):
         request_queue = Queue()
-        result_queue = Queue()
-        requester = [Thread(target=self.handle_requests, args=(request_queue, result_queue)) for _ in range(6)]
+        scenario_failed = Event()
+        requester = [Thread(target=self.handle_requests, args=(request_queue, scenario_failed)) for _ in range(6)]
         for req in requester:
             req.start()
-        scenario_success = True
         self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
         scenario_start = time.time()
-        for stage in scenario:
-            for url in stage:
-                request_queue.put(url)
-            request_queue.join()
-            while True:
-                try:
-                    response = result_queue.get_nowait()
-                    if response.status != 200:
-                        sys.stderr.write("got http code {0}\n".format(response.status))
-                        scenario_success = False
-                except Empty:
-                    break
-            if not scenario_success:
-                break
+        request_queue.put('/')
+        request_queue.join()
         scenario_end = time.time()
         for req in requester:
             request_queue.put(None)
-        if scenario_success:
-            sys.stdout.write("{0} {1} 1\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
-        else:
-            sys.stdout.write("{0} {1} 0\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time))
+        sys.stdout.write("{0} {1} {2}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time, int(not scenario_failed.is_set())))
+        if scenario_failed.is_set():
             self.test_env.error_count += 1
         for req in requester:
             req.join()
@@ -134,15 +135,6 @@ class TestSetup(object):
         self.event_queue.join()
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
-    def stop(self, exception=None):
-        sys.stderr.write("Forced exit")
-        if exception:
-            sys.stderr.write("An exception occured:\n")
-            sys.stderr.write(exception)
-        sys.stdout.flush()
-        sys.stderr.flush()
-        sys.exit(1)
-
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Loadtest a website with a somewhat realistic access pattern.')
@@ -155,10 +147,4 @@ if __name__ == '__main__':
     parser.add_argument('address', help='the address to connect to')
 
     args = parser.parse_args()
-
-    testSetup = TestSetup(args)
-    Timer(args.duration + 4 * 60, testSetup.stop)
-    try:
-        testSetup.run()
-    except Exception as e:
-        testSetup.stop(e)
+    TestSetup(args).run()

@@ -37,7 +37,7 @@ def analyze(data)
     end
   end
 
-  show_stats buckets, "\t"
+  show_stats buckets, :prefix => "\t", :unit => '#'
 end
 
 

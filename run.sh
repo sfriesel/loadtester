@@ -8,8 +8,9 @@ set output './results-$d.png';
 set palette model RGB defined ( 0 'red', 1 'green' );
 set cbrange [0:1]
 set grid x y
+set xlabel 'wallclock time [s]'
 set logscale y
-set ytics nomirror
+set ytics add (0.2,0.3,0.4,0.5,0.6,0.8,1.2,1.5,2,3,4,5,6,8,12,15,20,30,40,50,60,80) nomirror
 set ylabel "session response time [s]"
 set y2tics nomirror
 set y2label "new sessions [1/s]"
