@@ -1,14 +1,8 @@
 #!/usr/bin/python2
 import gevent.monkey
 gevent.monkey.patch_all()
-from threading import (
-    Thread,
-    Event,
-)
-from Queue import (
-    Queue,
-    Empty,
-)
+from threading import Thread, Event, Timer
+from Queue import Queue, Empty
 import time
 import random
 import sys
@@ -140,6 +134,15 @@ class TestSetup(object):
         self.event_queue.join()
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
+    def stop(self, exception=None):
+        sys.stderr.write("Forced exit")
+        if exception:
+            sys.stderr.write("An exception occured:\n")
+            sys.stderr.write(exception)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.exit(1)
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Loadtest a website with a somewhat realistic access pattern.')
@@ -152,4 +155,10 @@ if __name__ == '__main__':
     parser.add_argument('address', help='the address to connect to')
 
     args = parser.parse_args()
-    TestSetup(args).run()
+
+    testSetup = TestSetup(args)
+    Timer(args.duration + 4 * 60, testSetup.stop)
+    try:
+        testSetup.run()
+    except Exception as e:
+        testSetup.stop(e)
