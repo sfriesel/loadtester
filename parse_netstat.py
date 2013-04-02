@@ -1,14 +1,13 @@
 
-import sys
+import sys, re
 
 from operator import add
 
-
-def parse_file(path):
-    f = open(path)
+def parse_file(lines):
     data = {}
-    for names in f:
-        values = f.next()
+    itr = iter(lines)
+    for names in itr:
+        values = itr.next()
         names_parsed = names.rstrip().split(" ")
         category = names_parsed[0]
         names_parsed = names_parsed[1:]
@@ -24,8 +23,14 @@ def mapdata(op, d1, d2):
 def diff(d1, d2):
     return mapdata((lambda x, y: y - x), d1, d2)
 
+def diffs(d1s, d2s):
+     return dict((node, diff(d1, d2s[node])) for node, d1 in d1s.iteritems())
+
+def reducedata(op, ds):
+    return reduce((lambda d1, d2: mapdata(op, d1, d2)), ds)
+
 def sumdata(ds):
-    return reduce((lambda d1, d2: mapdata(add, d1, d2)), ds)
+    return reducedata(add, ds)
 
 def readable(x, show_sign=False):
     work = str(abs(x))
@@ -41,14 +46,30 @@ def readable(x, show_sign=False):
             res = '+' + res
     return res
 
-def pretty_print(diffd, d1, d2):
+def pretty_print(diffd, d1, d2, dmin, dmax):
     for cat, vals in diffd.iteritems():
         print cat
         for name, val in sorted(vals.iteritems()):
             if not val == 0:
-                print '   %s %s (%s)' % (name, readable(val, True),
-                                         readable(d1[cat][name]))
+                print '   %s %s (%s) min: %s max: %s' % (name,
+                                                         readable(val, True),
+                                                         readable(d1[cat][name]),
+                                                         readable(dmin[cat][name]),
+                                                         readable(dmax[cat][name]))
 
+with open(sys.argv[1]) as f:
+    data = f.read()
+
+before, after = data.split('-' * 69 + '\n')
+
+def parse_files(s):
+    data = {}
+    for f in re.split("\n\n+", s.rstrip('\n')):
+        lines = f.split('\n')
+        data[lines[0]] = parse_file(lines[1:])
+    return data
+
+"""
 paths = sys.argv[1:]
 
 datas = [parse_file(path) for path in paths]
@@ -57,5 +78,17 @@ midpoint = len(datas) / 2
 
 s1 = sumdata(datas[:midpoint])
 s2 = sumdata(datas[midpoint:])
+"""
 
-pretty_print(diff(s1, s2), s1, s2)
+s1s = parse_files(before)
+s2s = parse_files(after)
+
+s1 = sumdata(s1s.values())
+s2 = sumdata(s2s.values())
+
+dfs = diffs(s1s, s2s)
+
+smin = reducedata(min, dfs.values())
+smax = reducedata(max, dfs.values())
+
+pretty_print(sumdata(dfs.values()), s1, s2, smin, smax)
