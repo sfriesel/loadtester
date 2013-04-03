@@ -57,10 +57,6 @@ def pretty_print(diffd, d1, d2, dmin, dmax):
                                                          readable(dmin[cat][name]),
                                                          readable(dmax[cat][name]))
 
-with open(sys.argv[1]) as f:
-    data = f.read()
-
-before, after = data.split('-' * 69 + '\n')
 
 def parse_files(s):
     data = {}
@@ -69,19 +65,26 @@ def parse_files(s):
         data[lines[0]] = parse_file(lines[1:])
     return data
 
-"""
-paths = sys.argv[1:]
+if sys.argv[1] == '--multiple':
 
-datas = [parse_file(path) for path in paths]
+    paths = sys.argv[2:]
 
-midpoint = len(datas) / 2
+    datas = [parse_file(open(path)) for path in paths]
 
-s1 = sumdata(datas[:midpoint])
-s2 = sumdata(datas[midpoint:])
-"""
+    midpoint = len(datas) / 2
 
-s1s = parse_files(before)
-s2s = parse_files(after)
+    s1s = dict(zip(xrange(midpoint), datas[:midpoint]))
+    s2s = dict(zip(xrange(midpoint), datas[midpoint:]))
+
+else:
+
+    with open(sys.argv[1]) as f:
+        data = f.read()
+
+    before, after = data.split('-' * 69 + '\n')
+
+    s1s = parse_files(before)
+    s2s = parse_files(after)
 
 s1 = sumdata(s1s.values())
 s2 = sumdata(s2s.values())
