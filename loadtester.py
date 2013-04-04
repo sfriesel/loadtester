@@ -44,7 +44,8 @@ class Browser(gevent.Greenlet):
             response = self.pool.urlopen('GET', url, headers={
                 'Host': self.test_env.args.host or self.test_env.args.address,
                 'Connection': 'keep-alive',
-                'User-Agent': 'sfloadtester'})
+                'User-Agent': 'sfloadtester'},
+                timeout=120)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
             response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
 
