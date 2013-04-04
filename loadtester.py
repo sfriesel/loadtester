@@ -22,7 +22,7 @@ class Browser(gevent.Greenlet):
         self.log_requests = bool(self.test_env.requests_file)
         self.pool = None
 
-    def run(self):
+    def _run(self):
         event_time = self.delay + self.test_env.start_time
         # for now event is just the time when the next scenario should be run
         now = time.time()
@@ -100,10 +100,13 @@ class TestSetup(object):
             browser = Browser(self, delay)
             self.browsers.add(browser)
             browser.start_later(max(0, self.start_time + delay - time.time()))
-        self.browsers.join(timeout=self.args.duration + 60, raise_error=True)
-        self.browsers.kill(exception=RuntimeError)
-        self.browsers.join(timeout=2, raise_error=True)
-        sys.stderr.write("error count: {0}\n".format(self.error_count))
+        self.browsers.join(timeout=self.args.duration + 600, raise_error=True)
+        if len(self.browsers):
+            self.browsers.kill(exception=RuntimeError)
+            self.browsers.join(timeout=2, raise_error=True)
+            raise Exception('deadlock')
+        else:
+            sys.stderr.write("error count: {0}\n".format(self.error_count))
 
 
 if __name__ == '__main__':
