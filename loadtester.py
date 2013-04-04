@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 import gevent.monkey
 gevent.monkey.patch_all()
-from threading import Thread, Event, Timer
+from threading import Thread, Event
 from Queue import Queue
 import time
 import random
@@ -34,42 +34,47 @@ class Browser(Thread):
             self.run_scenario()
             self.event_queue.task_done()
 
+    def make_request(self, request_queue, scenario_failed, url):
+        if self.log_requests:
+            request_start = time.time()
+        try:
+            response = self.pool.urlopen('GET', url, headers={
+                'Host': self.test_env.args.host or self.test_env.args.address,
+                'Connection': 'keep-alive',
+                'User-Agent': 'sfloadtester'})
+        except (socket.error, urllib3.exceptions.HTTPError) as e:
+            response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
+        else:
+            if response.status == 200 and response.getheader('content-type').startswith('text/'):
+                content = response.data
+                for line in content.split('\n'):
+                    if line == '':
+                        break
+                    else:
+                        request_queue.put(line.rstrip())
+
+        if self.log_requests:
+            request_end = time.time()
+            self.test_env.requests_file.write(
+                '{browser_number} {start} {end} {status}\n'.format(
+                    browser_number=int(self.name),
+                    start=request_start - self.test_env.start_time,
+                    end=request_end - self.test_env.start_time,
+                    status=response.status))
+
+        if response.status != 200:
+            sys.stderr.write(url + " got http code {0}\n".format(response.status))
+            scenario_failed.set()
+
     def handle_requests(self, request_queue, scenario_failed):
         while True:
             url = request_queue.get(block=True)
-            if url is None:
-                break
-            if self.log_requests:
-                request_start = time.time()
             try:
-                response = self.pool.urlopen('GET', url, headers={
-                    'Host': self.test_env.args.host or self.test_env.args.address,
-                    'Connection': 'keep-alive',
-                    'User-Agent': 'sfloadtester'})
-            except (socket.error, urllib3.exceptions.HTTPError) as e:
-                response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
-            else:
-                if response.status == 200 and response.getheader('content-type').startswith('text/'):
-                    content = response.data
-                    for line in content.split('\n'):
-                        if line == '':
-                            break
-                        else:
-                            request_queue.put(line.rstrip())
-
-            if self.log_requests:
-                request_end = time.time()
-                self.test_env.requests_file.write(
-                    '{browser_number} {start} {end} {status}\n'.format(
-                        browser_number=int(self.name),
-                        start=request_start - self.test_env.start_time,
-                        end=request_end - self.test_env.start_time,
-                        status=response.status))
-
-            if response.status != 200:
-                sys.stderr.write(url + " got http code {0}\n".format(response.status))
-                scenario_failed.set()
-            request_queue.task_done()
+                if url is None:
+                    break
+                self.make_request(request_queue, scenario_failed, url)
+            finally:
+                request_queue.task_done()
 
     def run_scenario(self):
         request_queue = Queue()
@@ -127,17 +132,17 @@ class TestSetup(object):
         self.start_time = self.args.start_time or time.time()
         for event in events:
             self.event_queue.put(event)
-        self.event_queue.join()
+        stop = time.time() + self.args.duration + 600
+        while time.time() < stop:
+            if self.event_queue.unfinished_tasks:
+                time.sleep(1)
+            else:
+                break
+        else:
+            sys.stderr.write('event_queue took too long to drain (deadlock?)\n')
+            sys.exit(1)
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
-    def stop(self, exception=None):
-        sys.stderr.write("Forced exit")
-        if exception:
-            sys.stderr.write("An exception occured:\n")
-            sys.stderr.write(exception)
-        sys.stdout.flush()
-        sys.stderr.flush()
-        sys.exit(1)
 
 if __name__ == '__main__':
     import argparse
@@ -152,9 +157,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    testSetup = TestSetup(args)
-    Timer(args.duration + 4 * 60, testSetup.stop)
-    try:
-        testSetup.run()
-    except Exception as e:
-        testSetup.stop(e)
+    TestSetup(args).run()
