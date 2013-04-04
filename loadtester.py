@@ -99,7 +99,7 @@ class TestSetup(object):
         for delay in events_iter:
             browser = Browser(self, delay)
             self.browsers.add(browser)
-            browser.start_later(delay)
+            browser.start_later(max(0, self.start_time + delay - time.time()))
         self.browsers.join(timeout=self.args.duration + 600, raise_error=True)
         for browser in self.browsers:
             browser.kill()
