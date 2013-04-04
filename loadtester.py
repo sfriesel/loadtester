@@ -2,7 +2,7 @@
 import gevent.monkey
 gevent.monkey.patch_all()
 from threading import Thread, Event, Timer
-from Queue import Queue, Empty
+from Queue import Queue
 import time
 import random
 import sys
@@ -10,6 +10,7 @@ import socket
 import itertools
 from collections import namedtuple
 import urllib3.connectionpool
+import urllib3.exceptions
 
 
 class Browser(Thread):
@@ -45,7 +46,7 @@ class Browser(Thread):
                     'Host': self.test_env.args.host or self.test_env.args.address,
                     'Connection': 'keep-alive',
                     'User-Agent': 'sfloadtester'})
-            except socket.error as e:
+            except (socket.error, urllib3.exceptions.HTTPError) as e:
                 response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
             else:
                 if response.status == 200 and response.getheader('content-type').startswith('text/'):
