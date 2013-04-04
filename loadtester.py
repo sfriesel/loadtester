@@ -100,7 +100,10 @@ class TestSetup(object):
             browser = Browser(self, delay)
             self.browsers.add(browser)
             browser.start_later(delay)
-        self.browsers.join(timeout=self.args.duration, raise_error=True)
+        self.browsers.join(timeout=self.args.duration + 600, raise_error=True)
+        for browser in self.browsers:
+            browser.kill()
+            browser.get()
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
 
