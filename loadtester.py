@@ -76,8 +76,10 @@ class Browser(Thread):
         requester = [Thread(target=self.handle_requests, args=(request_queue, scenario_failed)) for _ in range(6)]
         for req in requester:
             req.start()
-        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
         scenario_start = time.time()
+        if self.pool:
+            self.pool.close()
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
         request_queue.put('/')
         request_queue.join()
         scenario_end = time.time()
@@ -88,7 +90,6 @@ class Browser(Thread):
             self.test_env.error_count += 1
         for req in requester:
             req.join()
-        self.pool.close()
         return scenario_end - scenario_start
 
 
@@ -126,6 +127,7 @@ class TestSetup(object):
         self.start_time = self.args.start_time or time.time()
         for event in events:
             self.event_queue.put(event)
+        print "queue put", time.time() - self.start_time
         self.event_queue.join()
         sys.stderr.write("error count: {0}\n".format(self.error_count))
 
