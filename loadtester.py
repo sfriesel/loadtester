@@ -51,7 +51,7 @@ class Browser(gevent.Greenlet):
                 pool_timeout=65,
                 retries=0)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
-            response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
+            response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=repr(e), exception=e)
 
         if self.log_requests:
             request_end = time.time()
