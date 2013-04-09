@@ -6,6 +6,7 @@ import gevent.pool
 import time
 import random
 import sys
+import signal
 import socket
 import itertools
 from collections import namedtuple
@@ -111,6 +112,11 @@ class TestSetup(object):
         else:
             sys.stderr.write("error count: {0}\n".format(self.error_count))
 
+    def term(self):
+        self.browsers.kill(exception=RuntimeError)
+        self.browsers.join(timeout=2, raise_error=True)
+        raise Exception('killed by signal')
+
 
 if __name__ == '__main__':
     import argparse
@@ -124,4 +130,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    TestSetup(args).run()
+    s = TestSetup(args)
+    signal.signal(signal.SIGTERM, s.term)
+    s.run()
