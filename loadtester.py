@@ -28,7 +28,16 @@ class Browser(gevent.Greenlet):
         if abs(scenario_start - event_time) > 0.05:
             sys.stderr.write("WARNING: missed event {event} by {diff}s\n".format(event=self.delay, diff=(scenario_start - event_time)))
         host, _, port = self.test_env.args.address.partition(':')
-        self.pool = urllib3.connectionpool.HTTPConnectionPool(host, port=(port or 80), maxsize=6, block=True)
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(
+            host=host,
+            port=(port or 80),
+            maxsize=6,
+            block=True,
+            headers={
+                'Host': self.test_env.args.host or host,
+                'Connection': 'keep-alive',
+                'User-Agent': 'sfloadtester'},
+        )
         scenario_success = False
         try:
             scenario_success = self.make_request('/')
@@ -43,13 +52,7 @@ class Browser(gevent.Greenlet):
         if self.log_requests:
             request_start = time.time()
         try:
-            response = self.pool.urlopen('GET', url, headers={
-                'Host': self.test_env.args.host or self.test_env.args.address,
-                'Connection': 'keep-alive',
-                'User-Agent': 'sfloadtester'},
-                timeout=65,
-                pool_timeout=65,
-                retries=0)
+            response = self.pool.urlopen('GET', url, retries=0)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
             response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=repr(e), exception=e)
         except Exception:
