@@ -37,6 +37,7 @@ class Browser(gevent.Greenlet):
                 'Host': self.test_env.args.host or host,
                 'Connection': 'keep-alive',
                 'User-Agent': 'sfloadtester'},
+            strict=True,
         )
         scenario_success = False
         try:
