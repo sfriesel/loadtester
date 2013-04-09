@@ -48,6 +48,7 @@ class Browser(gevent.Greenlet):
                 'Connection': 'keep-alive',
                 'User-Agent': 'sfloadtester'},
                 timeout=65,
+                pool_timeout=65,
                 retries=0)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
             response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=str(e), exception=e)
