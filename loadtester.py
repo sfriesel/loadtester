@@ -64,7 +64,7 @@ class Browser(gevent.Greenlet):
 
         if response.status == 200 and response.getheader('content-type').startswith('text/'):
             try:
-                subresults = gevent.pool.Group().imap(self.make_request, iter(iter(response.data.split('\n')).next, ''))
+                subresults = gevent.pool.Group().map(self.make_request, iter(iter(response.data.split('\n')).next, ''))
             except Exception:
                 sys.stderr.write('>>>' + response.data + '<<<')
                 raise
