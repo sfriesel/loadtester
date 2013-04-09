@@ -99,7 +99,12 @@ class TestSetup(object):
         self.browsers = gevent.pool.Group()
 
     def run(self):
-        events_iter = itertools.chain(uniform_dist(num=self.args.uniform * self.args.duration / 60, duration=self.args.duration))
+        events_iter = itertools.chain(uniform_dist(num=self.args.uniform * self.args.duration / 60,
+                                                   duration=self.args.duration),
+                                      gaussian_dist(num=self.args.gauss * self.args.duration / 60,
+                                                    duration=self.args.duration,
+                                                    mean=self.args.duration / 3,
+                                                    stddev=self.args.duration / 8))
         self.start_time = self.args.start_time or time.time()
         for delay in events_iter:
             browser = Browser(self, delay)
@@ -124,6 +129,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Loadtest a website with a somewhat realistic access pattern.')
     parser.add_argument('--duration', default=60, type=int, help='test duration in seconds')
     parser.add_argument('--uniform', default=600, type=int, help='uniformly distributed sessions per minute')
+    parser.add_argument('--gauss', default=0, type=int, help='gaussian distributed sessions per minute')
     parser.add_argument('--start-time', type=float, help='time when to start the test (unix timestamp)')
     parser.add_argument('--host', help='value of host header (default is domain)')
     parser.add_argument('--requests-file', metavar='FILE', nargs=1, help='in addition to normal output, log every single request to FILE')
