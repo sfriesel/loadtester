@@ -27,7 +27,8 @@ class Browser(gevent.Greenlet):
         scenario_start = time.time()
         if abs(scenario_start - event_time) > 0.05:
             sys.stderr.write("WARNING: missed event {event} by {diff}s\n".format(event=self.delay, diff=(scenario_start - event_time)))
-        self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
+        host, _, port = self.test_env.args.address.partition(':')
+        self.pool = urllib3.connectionpool.HTTPConnectionPool(host, port=(port or 80), maxsize=6, block=True)
         scenario_success = False
         try:
             scenario_success = self.make_request('/')
