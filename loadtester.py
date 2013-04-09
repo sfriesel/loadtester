@@ -65,7 +65,7 @@ class Browser(gevent.Greenlet):
             subresults = []
 
         if response.status != 200:
-            sys.stderr.write("{time} {url} got http code {code}\n".format(time=time.time - self.test_env.start_time, url=url, code=response.status))
+            sys.stderr.write("{time} {url} got http code {code}\n".format(time=time.time() - self.test_env.start_time, url=url, code=response.status))
 
         return response.status == 200 and all(subresults)
 
