@@ -53,7 +53,8 @@ class Browser(gevent.Greenlet):
         if self.log_requests:
             request_start = time.time()
         try:
-            response = self.pool.urlopen('GET', url, retries=0)
+            with gevent.Timeout(seconds=65, exception=urllib3.exceptions.HTTPError("urlopen timed out for " + url)):
+                response = self.pool.urlopen('GET', url, retries=0)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
             response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=repr(e), exception=e)
         except Exception:
