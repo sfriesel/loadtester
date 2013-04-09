@@ -13,6 +13,6 @@ set y2label "new sessions [1/s]"
 set tics out
 set autoscale  y
 set autoscale y2
-plot "$1" using 1:(abs(\$2-\$1)):(\$2-\$1):(0):3 with vectors palette title 'session response time [s]', "$1" using (floor(\$1)):(1) smooth freq with linespoints lt rgb "blue" axes x1y2 title 'new sessions [1/s]'
+plot "$1" using 1:(\$2-\$1):(\$2-\$1):(0):3 with vectors palette title 'session response time [s]', "$1" using (floor(\$1)):(1) smooth freq with linespoints lt rgb "blue" axes x1y2 title 'new sessions [1/s]'
 EOF
 
