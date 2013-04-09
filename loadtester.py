@@ -17,7 +17,6 @@ import urllib3.exceptions
 class Browser(gevent.Greenlet):
     def __init__(self, test, delay, **kwargs):
         gevent.Greenlet.__init__(self, **kwargs)
-        self.name = '0'
         self.test_env = test
         self.delay = delay
         self.log_requests = bool(self.test_env.requests_file)
@@ -57,7 +56,7 @@ class Browser(gevent.Greenlet):
             request_end = time.time()
             self.test_env.requests_file.write(
                 '{browser_number} {start} {end} {status}\n'.format(
-                    browser_number=int(self.name),
+                    browser_number=0,
                     start=request_start - self.test_env.start_time,
                     end=request_end - self.test_env.start_time,
                     status=response.status))
