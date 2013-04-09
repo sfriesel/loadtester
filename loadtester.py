@@ -28,7 +28,10 @@ class Browser(gevent.Greenlet):
         if abs(scenario_start - event_time) > 0.05:
             sys.stderr.write("WARNING: missed event {event} by {diff}s\n".format(event=self.delay, diff=(scenario_start - event_time)))
         self.pool = urllib3.connectionpool.HTTPConnectionPool(self.test_env.args.address, port=80, maxsize=6, block=True)
-        scenario_success = self.make_request('/')
+        try:
+            scenario_success = self.make_request('/')
+        except RuntimeError:
+            scenario_success = False
         scenario_end = time.time()
         sys.stdout.write("{0} {1} {2}\n".format(scenario_start - self.test_env.start_time, scenario_end - self.test_env.start_time, int(scenario_success)))
         if not scenario_success:
