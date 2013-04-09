@@ -109,7 +109,7 @@ class TestSetup(object):
             browser = Browser(self, delay)
             self.browsers.add(browser)
             browser.start_later(max(0, self.start_time + delay - time.time()))
-        self.browsers.join(timeout=self.args.duration + 600, raise_error=True)
+        self.browsers.join(timeout=self.args.duration + 70, raise_error=True)
         if len(self.browsers):
             self.browsers.kill(exception=RuntimeError)
             self.browsers.join(timeout=2, raise_error=True)
@@ -120,7 +120,7 @@ class TestSetup(object):
     def term(self):
         self.browsers.kill(exception=RuntimeError)
         self.browsers.join(timeout=2, raise_error=True)
-        raise Exception('killed by signal')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
