@@ -86,7 +86,7 @@ def gaussian_dist(num, duration, mean, stddev):
         if value >= 0 and value < duration:
             num -= 1
             yield value
-    else:
+    if num:
         raise Exception("failed to generate requested distribution")
 
 
