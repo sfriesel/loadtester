@@ -57,9 +57,6 @@ class Browser(gevent.Greenlet):
                 response = self.pool.urlopen('GET', url, retries=0)
         except (socket.error, urllib3.exceptions.HTTPError) as e:
             response = namedtuple(typename='SocketErrorResponse', field_names=['status', 'exception'])(status=repr(e), exception=e)
-        except Exception:
-            sys.stderr.write(url + " failed in urlopen\n")
-            raise
 
         if self.log_requests:
             request_end = time.time()
@@ -74,7 +71,7 @@ class Browser(gevent.Greenlet):
             try:
                 subresults = gevent.pool.Group().map(self.make_request, iter(iter(response.data.split('\n')).next, ''))
             except Exception:
-                sys.stderr.write(url + " failed in map\n")
+                sys.stderr.write('>>>' + response.data + '<<<')
                 raise
         else:
             subresults = []
